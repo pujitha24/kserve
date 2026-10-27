@@ -613,10 +613,10 @@ func ReconcileForIsvcs(
 				pvcName := params.Name + "-" + nodeGroupName
 				pvName := pvcName + "-" + namespace
 
-				if params.IsNamespaceScoped {
-					if err := DeletePV(ctx, clientset, log, pvName); err != nil {
-						log.Error(err, "failed to delete serving PV for removed ISVC namespace", "name", pvName)
-					}
+				// The serving PV is Retain and keeps claimRef to the deleted PVC's UID, so a
+				// later PVC in this namespace could never bind it. Delete it; it is recreated on demand.
+				if err := DeletePV(ctx, clientset, log, pvName); err != nil {
+					log.Error(err, "failed to delete serving PV for removed ISVC namespace", "name", pvName)
 				}
 
 				if err := DeletePVC(ctx, clientset, log, pvcName, namespace); err != nil {

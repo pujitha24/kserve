@@ -482,6 +482,17 @@ var _ = Describe("CachedModel controller", func() {
 
 			Expect(k8sClient.Delete(ctx, isvc1)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, isvc2)).Should(Succeed())
+
+			// envtest has no PV protection controller, so a deleted PV stays terminating
+			// instead of disappearing. Otherwise the Retain PV keeps its stale claimRef and
+			// the next PVC in this namespace never binds.
+			for _, key := range []types.NamespacedName{pvLookupKey1, pvLookupKey2} {
+				Eventually(func() bool {
+					pv := &corev1.PersistentVolume{}
+					err := k8sClient.Get(ctx, key, pv)
+					return errors.IsNotFound(err) || (err == nil && pv.DeletionTimestamp != nil)
+				}, timeout, interval).Should(BeTrue(), "Serving PV should be deleted with its PVC")
+			}
 		})
 
 		It("Should track LLMInferenceService in cluster-scoped cache status", func() {
